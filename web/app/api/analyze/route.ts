@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.slice("Bearer ".length);
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
     const aiUrl = process.env.AI_SERVICE_URL ?? "http://localhost:8000";
 
     const supabase = createClient(supabaseUrl, supabaseAnon, {
