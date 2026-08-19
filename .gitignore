@@ -1,0 +1,62 @@
+# datasets/
+# raw-datasets/
+# research-data/
+# *.pt
+# *.pth
+# *.ckpt
+# *.onnx
+# __pycache__/
+# *.py[cod]
+# .venv/
+# venv/
+# runs/
+# experiments/
+# mlruns/
+# artifacts/
+# .DS_Store
+# Thumbs.db
+# Private environment variables
+.env
+.env.*
+!.env.example
+
+# Datasets and research data
+datasets/
+raw-datasets/
+research-data/
+
+# Ignore model artifacts by default
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Include only selected production models
+!ai-service/models/wound-efficientnet-b0-binary.pt
+!ai-service/models/wound-type-efficientnet-b0-v1.pt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Node and Next.js
+node_modules/
+.next/
+web/next-env.d.ts
+out/
+.vercel/
+
+# Training outputs
+runs/
+experiments/
+mlruns/
+artifacts/
+ai-service/gradcam_test_output.jpg
+
+# Operating system files
+.DS_Store
+Thumbs.db
