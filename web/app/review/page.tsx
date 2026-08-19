@@ -3,12 +3,22 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const CLASSES = ["Abrasion", "Laceration", "Burn", "Puncture", "Surgical Wound", "Other / Unknown"];
+const CLASSES = [
+  "Normal",
+  "Wound",
+  "Diabetic",
+  "Pressure",
+  "Surgical",
+  "Venous",
+  "Other / Unknown"
+];
 
 type ReviewItem = {
   id: string;
   predicted_class: string;
   confidence_score: number;
+  wound_type: string | null;
+  wound_type_confidence: number | null;
   created_at: string;
   wound_images: { original_filename: string | null } | null;
 };
@@ -38,7 +48,7 @@ export default function ReviewPage() {
 
     const { data, error } = await supabase
       .from("predictions")
-      .select("id,predicted_class,confidence_score,created_at,wound_images(original_filename)")
+      .select("id,predicted_class,confidence_score,wound_type,wound_type_confidence,created_at,wound_images(original_filename)")
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -51,19 +61,28 @@ export default function ReviewPage() {
     setMessage("");
   }
 
+  function getAiClass(item: ReviewItem) {
+    return item.wound_type ?? item.predicted_class;
+  }
+
+  function getAiConfidence(item: ReviewItem) {
+    return item.wound_type_confidence ?? item.confidence_score;
+  }
+
   useEffect(() => { load(); }, []);
 
   async function submitReview(item: ReviewItem) {
     const { data: auth } = await supabase.auth.getUser();
     const reviewer = auth.user;
-    const verifiedClass = selected[item.id] ?? item.predicted_class;
+    const aiClass = getAiClass(item);
+    const verifiedClass = selected[item.id] ?? aiClass;
     if (!reviewer) return;
 
     const { error } = await supabase.from("expert_reviews").upsert({
       prediction_id: item.id,
       reviewer_id: reviewer.id,
       verified_class: verifiedClass,
-      is_prediction_correct: verifiedClass === item.predicted_class
+      is_prediction_correct: verifiedClass === aiClass
     }, { onConflict: "prediction_id,reviewer_id" });
 
     if (error) {
@@ -93,11 +112,11 @@ export default function ReviewPage() {
               {items.map((item) => (
                 <tr key={item.id}>
                   <td>{item.wound_images?.original_filename ?? "Image"}</td>
-                  <td>{item.predicted_class}</td>
-                  <td>{Math.round(item.confidence_score * 100)}%</td>
+                  <td>{getAiClass(item)}</td>
+                  <td>{Math.round(getAiConfidence(item) * 100)}%</td>
                   <td>
                     <select
-                      value={selected[item.id] ?? item.predicted_class}
+                      value={selected[item.id] ?? getAiClass(item)}
                       onChange={(e) => setSelected((old) => ({ ...old, [item.id]: e.target.value }))}
                     >
                       {CLASSES.map((c) => <option key={c}>{c}</option>)}
