@@ -167,6 +167,7 @@ def health():
 )
 async def predict(
     image: UploadFile = File(...),
+    include_gradcam: bool = False,
 ):
     if image.content_type not in ALLOWED_TYPES:
         raise HTTPException(
@@ -206,14 +207,20 @@ async def predict(
         result["predicted_class"] == "Wound"
         and not result["is_uncertain"]
     ):
-        wound_type_result, gradcam_image = (
-            wound_type_predictor.predict_with_gradcam(
+        if include_gradcam:
+            wound_type_result, gradcam_image = (
+                wound_type_predictor.predict_with_gradcam(
+                    pil_image
+                )
+            )
+        else:
+            wound_type_result = wound_type_predictor.predict(
                 pil_image
             )
-        )
 
         result.update(wound_type_result)
 
+    if include_gradcam and result.get("wound_type"):
         buffer = BytesIO()
 
         gradcam_image.save(
