@@ -13,7 +13,25 @@ type PredictionDetail = {
   confidence_score: number;
   is_uncertain: boolean;
   created_at: string;
-  model_versions: { name: string; version: string; status: string } | null;
+
+  gradcam_storage_path: string | null;
+
+  wound_type: string | null;
+  wound_type_confidence: number | null;
+  wound_type_uncertain: boolean | null;
+
+  model_versions: {
+    name: string;
+    version: string;
+    status: string;
+  } | null;
+
+  wound_type_model_versions: {
+    name: string;
+    version: string;
+    status: string;
+  } | null;
+
   wound_images: {
     original_filename: string | null;
     storage_path: string;
@@ -30,7 +48,9 @@ export default function HistoryDetailPage() {
   const [deleteError, setDeleteError] = useState("");
   const [prediction, setPrediction] = useState<PredictionDetail | null>(null);
   const [scores, setScores] = useState<Score[]>([]);
+  const [woundTypeScores, setWoundTypeScores] = useState<Score[]>([]);
   const [imageUrl, setImageUrl] = useState("");
+  const [gradcamUrl, setGradcamUrl] = useState("");
   const [message, setMessage] = useState("Loading analysis...");
 
   useEffect(() => {
@@ -41,15 +61,37 @@ export default function HistoryDetailPage() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("predictions")
-        .select(`
-          id,predicted_class,confidence_score,is_uncertain,created_at,
-          model_versions(name,version,status),
-          wound_images(original_filename,storage_path,mime_type,file_size_bytes)
-        `)
-        .eq("id", params.id)
-        .single();
+    const { data, error } = await supabase
+      .from("predictions")
+      .select(`
+        id,
+        predicted_class,
+        confidence_score,
+        is_uncertain,
+        created_at,
+        gradcam_storage_path,
+        wound_type,
+        wound_type_confidence,
+        wound_type_uncertain,
+        model_versions!predictions_model_version_id_fkey(
+          name,
+          version,
+          status
+        ),
+        wound_type_model_versions:model_versions!predictions_wound_type_model_version_id_fkey(
+          name,
+          version,
+          status
+        ),
+        wound_images(
+          original_filename,
+          storage_path,
+          mime_type,
+          file_size_bytes
+        )
+      `)
+      .eq("id", params.id)
+      .single();
 
       if (error) {
         setMessage(error.message);
@@ -72,11 +114,41 @@ export default function HistoryDetailPage() {
 
       setScores((scoreData ?? []) as Score[]);
 
+      const { data: woundTypeScoreData, error: woundTypeScoreError } =
+          await supabase
+            .from("wound_type_scores")
+            .select("category,probability")
+            .eq("prediction_id", params.id)
+            .order("probability", { ascending: false });
+
+      if (woundTypeScoreError) {
+        setMessage(woundTypeScoreError.message);
+        return;
+      }
+
+      setWoundTypeScores((woundTypeScoreData ?? []) as Score[]);
+
       if (detail.wound_images?.storage_path) {
         const { data: signed } = await supabase.storage
           .from("wound-images")
           .createSignedUrl(detail.wound_images.storage_path, 600);
         setImageUrl(signed?.signedUrl ?? "");
+      }
+
+      if (detail.gradcam_storage_path) {
+        const { data: gradcamSigned, error: gradcamError } =
+          await supabase.storage
+            .from("wound-images")
+            .createSignedUrl(detail.gradcam_storage_path, 600);
+
+        if (gradcamError) {
+          console.error(
+            "Unable to create Grad-CAM signed URL:",
+            gradcamError
+          );
+        } else {
+          setGradcamUrl(gradcamSigned?.signedUrl ?? "");
+        }
       }
 
       setMessage("");
@@ -169,6 +241,59 @@ export default function HistoryDetailPage() {
           </div>
           <div className="bar detail-main-bar"><span style={{ width: `${prediction.confidence_score * 100}%` }} /></div>
           <div className="detail-model"><span className="small muted">MODEL VERSION</span><strong>{prediction.model_versions ? `${prediction.model_versions.name} • ${prediction.model_versions.version}` : "—"}</strong></div>
+          {prediction.wound_type && (
+  <div
+    style={{
+      marginTop: 24,
+      paddingTop: 20,
+      borderTop: "1px solid #d8e0e5"
+    }}
+  >
+    <p className="small history-eyebrow">WOUND TYPE CLASSIFICATION</p>
+
+    <div className="detail-result">
+      <div>
+        <span className="small muted">WOUND TYPE</span>
+
+        <div className="detail-result-name">
+          {prediction.wound_type_uncertain
+            ? "Uncertain"
+            : prediction.wound_type}
+        </div>
+      </div>
+
+      <div>
+        <span className="small muted">CONFIDENCE</span>
+
+        <div className="detail-confidence">
+          {prediction.wound_type_confidence !== null
+            ? `${(prediction.wound_type_confidence * 100).toFixed(1)}%`
+            : "—"}
+        </div>
+      </div>
+    </div>
+
+    {prediction.wound_type_confidence !== null && (
+      <div className="bar detail-main-bar">
+        <span
+          style={{
+            width: `${prediction.wound_type_confidence * 100}%`
+          }}
+        />
+      </div>
+    )}
+
+    <div className="detail-model">
+      <span className="small muted">WOUND TYPE MODEL</span>
+
+      <strong>
+        {prediction.wound_type_model_versions
+          ? `${prediction.wound_type_model_versions.name} • ${prediction.wound_type_model_versions.version}`
+          : "—"}
+      </strong>
+    </div>
+  </div>
+)}
           <div className="warning">Research/decision-support result only. This is not a medical diagnosis.</div>
           {deleteError && (
           <div className="error" style={{ marginTop: "16px" }}>
@@ -199,12 +324,95 @@ export default function HistoryDetailPage() {
           </div>
         ))}
       </section>
+      {woundTypeScores.length > 0 && (
+      <section className="card detail-scores">
+        <div className="detail-section-title">
+          <div>
+            <p className="small history-eyebrow">
+              WOUND TYPE DISTRIBUTION
+            </p>
 
-      <section className="card phase-placeholder">
+            <h2>Wound type probabilities</h2>
+          </div>
+
+          <span className="small muted">
+            {woundTypeScores.length} classes
+          </span>
+        </div>
+
+        {woundTypeScores.map((score, index) => (
+          <div
+            className="detail-score-row"
+            key={score.category}
+          >
+            <div className="detail-score-rank">
+              {index + 1}
+            </div>
+
+            <div className="detail-score-main">
+              <div className="scoreline">
+                <span>{score.category}</span>
+
+                <strong>
+                  {(score.probability * 100).toFixed(1)}%
+                </strong>
+              </div>
+
+              <div className="bar">
+                <span
+                  style={{
+                    width: `${score.probability * 100}%`
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </section>
+    )}
+
+      {/* <section className="card phase-placeholder">
         <p className="small history-eyebrow">EXPLAINABILITY</p>
         <h2>Grad-CAM visualization</h2>
         <p className="muted">Reserved for the Explainable AI phase.</p>
-      </section>
+      </section> */}
+
+      <section className="card phase-placeholder">
+      <p className="small history-eyebrow">EXPLAINABILITY</p>
+      <h2>Grad-CAM visualization</h2>
+
+      {gradcamUrl ? (
+        <>
+          <div
+            style={{
+              marginTop: 16,
+              display: "flex",
+              justifyContent: "center"
+            }}
+          >
+            <img
+              src={gradcamUrl}
+              alt="Grad-CAM visualization"
+              style={{
+                width: "100%",
+                maxWidth: "600px",
+                borderRadius: "12px",
+                border: "1px solid #d8e0e5"
+              }}
+            />
+          </div>
+
+          <p className="muted" style={{ marginTop: 16 }}>
+            Highlighted regions indicate image areas that contributed most
+            strongly to the wound-type model prediction.
+          </p>
+        </>
+      ) : (
+        <p className="muted">
+          Grad-CAM visualization is not available for this analysis.
+        </p>
+      )}
+    </section>
     </>
   );
 }

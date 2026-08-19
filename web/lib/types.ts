@@ -11,4 +11,11 @@ export type AnalysisResult = {
   scores: PredictionScore[];
   modelName: string;
   modelVersion: string;
+
+  woundType?: string | null;
+  woundTypeConfidence?: number | null;
+  woundTypeUncertain?: boolean | null;
+  woundTypeScores?: PredictionScore[];
+  woundTypeModelName?: string | null;
+  woundTypeModelVersion?: string | null;
 };
