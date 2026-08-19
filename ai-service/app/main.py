@@ -5,6 +5,7 @@ import os
 from io import BytesIO
 from typing import List, Optional
 
+import torch
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,23 @@ from .wound_type_predictor import WoundTypePredictor
 
 
 load_dotenv()
+
+TORCH_NUM_THREADS = max(
+    1,
+    int(os.getenv("TORCH_NUM_THREADS", "2")),
+)
+
+torch.set_num_threads(TORCH_NUM_THREADS)
+try:
+    torch.set_num_interop_threads(1)
+except RuntimeError:
+    pass
+
+print(
+    f"PyTorch CPU threads: {torch.get_num_threads()}, "
+    f"interop threads: {torch.get_num_interop_threads()}",
+    flush=True,
+)
 
 
 MODEL_MODE = os.getenv(
