@@ -15,6 +15,8 @@ export async function POST(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
     const aiUrl = process.env.AI_SERVICE_URL ?? "http://localhost:8000";
+    const includeGradcam =
+      process.env.AI_INCLUDE_GRADCAM === "true";
 
     const supabase = createClient(supabaseUrl, supabaseAnon, {
       global: { headers: { Authorization: `Bearer ${token}` } }
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
     const aiForm = new FormData();
     aiForm.append("image", new Blob([bytes], { type: image.type }), image.name);
 
-    const aiResponse = await fetch(`${aiUrl}/v1/predict`, {
+    const aiResponse = await fetch(`${aiUrl}/v1/predict?include_gradcam=${includeGradcam}`, {
       method: "POST",
       body: aiForm,
       cache: "no-store"
