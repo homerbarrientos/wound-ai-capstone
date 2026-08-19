@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
     const aiUrl = process.env.AI_SERVICE_URL ?? "http://localhost:8000";
-    const includeGradcam =
+    const gradcamEnabled =
       process.env.AI_INCLUDE_GRADCAM === "true";
 
     const supabase = createClient(supabaseUrl, supabaseAnon, {
@@ -29,6 +29,10 @@ export async function POST(request: NextRequest) {
 
     const form = await request.formData();
     const image = form.get("image");
+    const includeGradcamRequested =
+      form.get("includeGradcam") === "true";
+    const includeGradcam =
+      gradcamEnabled && includeGradcamRequested;
 
     if (!(image instanceof File)) {
       return NextResponse.json({ error: "Image is required." }, { status: 400 });
