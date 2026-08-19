@@ -10,6 +10,7 @@ export default function AnalyzePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
+  const [includeGradcam, setIncludeGradcam] = useState(true);
 
   useEffect(() => {
     if (!file) {
@@ -51,6 +52,10 @@ export default function AnalyzePage() {
 
     const body = new FormData();
     body.append("image", file);
+    body.append(
+      "includeGradcam",
+      String(includeGradcam)
+    );
 
     const response = await fetch("/api/analyze", {
       method: "POST",
@@ -100,6 +105,37 @@ export default function AnalyzePage() {
               {(file.size / 1024 / 1024).toFixed(2)} MB
             </p>
           )}
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              padding: "12px 14px",
+              border: "1px solid #d8e0e5",
+              borderRadius: 10
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={includeGradcam}
+              disabled={busy}
+              onChange={(event) =>
+                setIncludeGradcam(event.target.checked)
+              }
+              style={{ marginTop: 3 }}
+            />
+
+            <span>
+              <strong>
+                Generate Grad-CAM visualization
+              </strong>
+              <span className="small muted" style={{ display: "block" }}>
+                Highlights image regions that influenced the wound-type prediction.
+                Disable for faster analysis.
+              </span>
+            </span>
+          </label>
 
           {error && <div className="error">{error}</div>}
 
