@@ -34,10 +34,21 @@ class GradCAM:
         input_tensor: torch.Tensor,
         class_index: Optional[int] = None,
     ) -> np.ndarray:
-        self.model.zero_grad()
+        self.model.zero_grad(set_to_none=True)
 
         output = self.model(input_tensor)
 
+        return self.generate_from_output(
+            output=output,
+            class_index=class_index,
+        )
+
+    def generate_from_output(
+        self,
+        output: torch.Tensor,
+        class_index: Optional[int] = None,
+    ) -> np.ndarray:
+        """Build a CAM from an existing forward pass."""
         if class_index is None:
             class_index = int(torch.argmax(output, dim=1).item())
 

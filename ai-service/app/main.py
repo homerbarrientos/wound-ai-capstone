@@ -206,19 +206,13 @@ async def predict(
         result["predicted_class"] == "Wound"
         and not result["is_uncertain"]
     ):
-        wound_type_result = (
-            wound_type_predictor.predict(
+        wound_type_result, gradcam_image = (
+            wound_type_predictor.predict_with_gradcam(
                 pil_image
             )
         )
 
         result.update(wound_type_result)
-
-        gradcam_image = (
-            wound_type_predictor.generate_gradcam(
-                pil_image
-            )
-        )
 
         buffer = BytesIO()
 

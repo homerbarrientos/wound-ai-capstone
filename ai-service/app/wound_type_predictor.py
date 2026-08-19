@@ -151,6 +151,73 @@ class WoundTypePredictor:
             "wound_type_model_version": self.model_version,
         }
 
+    def predict_with_gradcam(
+        self,
+        image: Image.Image,
+    ) -> tuple[Dict, Image.Image]:
+        """Predict and generate Grad-CAM from one forward pass."""
+        import torch
+
+        if self.model is None or self.transform is None:
+            raise RuntimeError(
+                "Wound type model is not loaded."
+            )
+
+        image = image.convert("RGB")
+        input_tensor = self.transform(image).unsqueeze(0)
+        target_layer = self.model.features[-1]
+        gradcam = GradCAM(
+            model=self.model,
+            target_layer=target_layer,
+        )
+
+        try:
+            self.model.zero_grad(set_to_none=True)
+            logits = self.model(input_tensor)
+            probs = torch.softmax(
+                logits.detach(),
+                dim=1,
+            )[0].tolist()
+            class_index = int(
+                torch.argmax(logits, dim=1).item()
+            )
+            cam = gradcam.generate_from_output(
+                output=logits,
+                class_index=class_index,
+            )
+            overlay = overlay_gradcam(
+                image=image,
+                cam=cam,
+                alpha=0.45,
+            )
+        finally:
+            gradcam.close()
+
+        ranked = sorted(
+            zip(CLASSES, probs),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        category, confidence = ranked[0]
+        uncertain = confidence < self.confidence_threshold
+
+        result = {
+            "wound_type": category.title(),
+            "wound_type_confidence": float(confidence),
+            "wound_type_uncertain": uncertain,
+            "wound_type_scores": [
+                {
+                    "category": name.title(),
+                    "probability": float(probability),
+                }
+                for name, probability in ranked
+            ],
+            "wound_type_model_name": self.model_name,
+            "wound_type_model_version": self.model_version,
+        }
+
+        return result, overlay
+
     def generate_gradcam(
         self,
         image: Image.Image,
